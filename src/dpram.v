@@ -39,7 +39,7 @@ parameter LEVEL = 1
  );
 (* ram_style = "block" *)
 	localparam MEM_SIZE = 1<<LEVEL;
-	reg [DATA_WIDTH-1:0] ram[MEM_SIZE-1:0];  //body of the RAM	
+	
 generate
 	if (MEM_SIZE==1)
 		always@(posedge clk) begin
@@ -47,6 +47,7 @@ generate
 			q_b <= we_b ? data_b : q_b;
 		end	
 	else	begin
+	reg [DATA_WIDTH-1:0] ram[MEM_SIZE-1:0];  //body of the RAM	
 		always@(posedge clk) begin		
 			if (we_a) begin
 				ram[addr_a] <= data_a;
@@ -60,8 +61,6 @@ generate
 			q_b <= ram[addr_b];
 		end
 	end
-
-
 endgenerate
-	
+
 endmodule
