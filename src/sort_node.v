@@ -3,21 +3,23 @@
 // Company: 
 // Engineer: 
 // 
-// Create Date:    17:33:20 01/09/2018 
+// Create Date: 10/18/2018 04:19:35 PM
 // Design Name: 
-// Module Name:    sort_node 
+// Module Name: sort_node
 // Project Name: 
 // Target Devices: 
-// Tool versions: 
+// Tool Versions: 
 // Description: 
-//
+// 
 // Dependencies: 
-//
-// Revision: 
+// 
+// Revision:
 // Revision 0.01 - File Created
-// Additional Comments: 
-//
+// Additional Comments:
+// 
 //////////////////////////////////////////////////////////////////////////////////
+`define SIM
+`define _MAX_
 module sort_node
 	#(
 	parameter DATA_WIDTH = 32,
@@ -62,14 +64,14 @@ module sort_node
 	output reg [DATA_WIDTH-1:0] nl_out,
 	output reg nl_update_out,				//indicate nl_out is new
 	output [ADDR_WIDTH-1:0] nl_addr_out,
-	output reg nl_branch_out
+	output reg nl_branch_out               //0:left   1:right
 
 	
     );
 
 localparam ADDR_MAX = 1<<LEVEL;
 	
-localparam IDLE		= 2'b00;	//when pl_update_in is valid, write pl_in and nl_in(if valid) into register, and read DPRAM from next ADDR_WIDTH(lm and rm)
+localparam IDLE		= 2'b00;	//when pl_update_in is valid, write pl_in and nl_in(if valid) into register, and read DPRAM from next level(lm and rm)
 localparam INIT		= 2'b01;	//write INIT data into DPRAM
 localparam SWAP		= 2'b10;	//compare and swap the three data
 
@@ -78,8 +80,8 @@ reg [1:0] nstate;
 
 reg nl_update_in_r;
 
-reg [DATA_WIDTH-1:0] pl_in_r;	//cache input data from previous ADDR_WIDTH
-reg [DATA_WIDTH-1:0] nl_in_r;	//cache input data from next ADDR_WIDTH
+reg [DATA_WIDTH-1:0] pl_in_r;	//cache input data from previous level
+reg [DATA_WIDTH-1:0] nl_in_r;	//cache input data from next level
 reg [DATA_WIDTH-1:0] lm_in_r;  //select between lm_in and nl_in_r;
 reg [DATA_WIDTH-1:0] rm_in_r;  //select between rm_in and nl_in_r;
 reg [DATA_WIDTH-1:0] lm_in_r_reg; //avoid latch
@@ -129,7 +131,7 @@ always@(*) begin
 		pl_update_out = 0;
 		nl_out = nl_out_reg;
 		nl_update_out = 0;
-		lrm_addr = pl_addr_in + pl_branch_in * LEVEL;//lrm_addr_r;
+		lrm_addr = (pl_addr_in << 1) + pl_branch_in;// + pl_branch_in * LEVEL;//lrm_addr_r;
 		lm_we = 0;
 		rm_we = 0;
 		lm_in_r = lm_in_r_reg;
@@ -137,7 +139,8 @@ always@(*) begin
 		nl_branch_out = 0;
 	end
 	INIT: begin
-		pl_out = pl_out_reg;
+		//pl_out = pl_out_reg;
+		pl_out = INIT_DATA;
 		pl_update_out = 0;
 		nl_out = INIT_DATA;
 		nl_update_out = 1;
@@ -167,7 +170,12 @@ always@(*) begin
 			rm_in_r = rm_in;
 		end	
 		//swap up data and left data
-		if (cmp_lt(lm_in_r, pl_in_r) && cmp_lt(lm_in_r, rm_in_r)) begin
+`ifdef _MAX_
+        if (cmp_lt(pl_in_r, lm_in_r) && cmp_lte(rm_in_r, lm_in_r))// begin
+`else
+		if (cmp_lt(lm_in_r, pl_in_r) && cmp_lte(lm_in_r, rm_in_r))// begin
+`endif
+        begin
 			pl_out = lm_in_r;
 			nl_out = pl_in_r;
 			pl_update_out = 1;
@@ -176,8 +184,14 @@ always@(*) begin
 			rm_we = 0;
 			nl_branch_out = 0;
 		end
+
 		//swap up data and right data
-		else if (cmp_lt(rm_in_r, pl_in_r) && cmp_lt(rm_in_r, lm_in_r)) begin
+`ifdef _MAX_
+		else if (cmp_lt(pl_in_r, rm_in_r) && cmp_lt(lm_in_r, rm_in_r))
+`else	
+        else if (cmp_lt(rm_in_r, pl_in_r) && cmp_lt(rm_in_r, lm_in_r))
+`endif
+		begin
 			pl_out = rm_in_r;
 			nl_out = pl_in_r;
 			pl_update_out = 1;
@@ -190,8 +204,11 @@ always@(*) begin
 		else begin
 			pl_out = pl_in_r;
 			nl_out = nl_in_r;
-			pl_update_out = 0;
-			nl_update_out = 0;
+            pl_update_out = 1;
+            nl_update_out = 1;
+
+//			pl_update_out = 0;
+//			nl_update_out = 0;
 			lm_we = 0;
 			rm_we = 0;
 			nl_branch_out = 0;
@@ -272,6 +289,37 @@ function cmp_lt;        //return true if d1 key < d2 key
 		d2_flag = d2[DATA_WIDTH-1:DATA_WIDTH-2];
 		d1_key = d1[KEY_WIDTH-1:0];
 		d2_key = d2[KEY_WIDTH-1:0];
+		case (d1_flag)
+		2'b01: begin    //d1 is min
+		    case (d2_flag)
+		    2'b11: cmp_lt = 1;  //d2 is max
+		    2'b00: cmp_lt = 1;  //d2 is normal
+		    2'b01: cmp_lt = 0;  //d2 is min
+		    default: cmp_lt = 0;
+		    endcase
+        end
+        2'b11: begin    //d1 is max
+            cmp_lt = 0;
+        end
+        2'b00: begin    //d1 is normal
+            case(d2_flag)
+            2'b11: cmp_lt = 1;  //d2 is max
+            2'b01: cmp_lt = 0;  //d2 is min
+            2'b00: cmp_lt = d1_key < d2_key;  //d2 is normal
+            default: cmp_lt = 0;
+            endcase
+        end
+        default:
+            cmp_lt = 0;
+        endcase
+    end
+endfunction
+            
+            
+		    		    
+		
+	/*	
+		
 		//d1 is initial data
 		if (d1_flag==2'b01)
 			cmp_lt = 1;
@@ -296,7 +344,82 @@ function cmp_lt;        //return true if d1 key < d2 key
 			cmp_lt = 0;
 	end
 endfunction
-
+*/
+function cmp_lte;        //return true if d1 key <= d2 key
+	input [DATA_WIDTH-1:0] d1; 
+	input [DATA_WIDTH-1:0] d2;
+	reg [1:0] d1_flag;
+	reg [1:0] d2_flag;
+	reg [KEY_WIDTH-1:0] d1_key;
+	reg [KEY_WIDTH-1:0] d2_key;	
+	begin
+		d1_flag = d1[DATA_WIDTH-1:DATA_WIDTH-2];
+		d2_flag = d2[DATA_WIDTH-1:DATA_WIDTH-2];
+		d1_key = d1[KEY_WIDTH-1:0];
+		d2_key = d2[KEY_WIDTH-1:0];
+		d1_flag = d1[DATA_WIDTH-1:DATA_WIDTH-2];
+        d2_flag = d2[DATA_WIDTH-1:DATA_WIDTH-2];
+        d1_key = d1[KEY_WIDTH-1:0];
+        d2_key = d2[KEY_WIDTH-1:0];
+        case (d1_flag)
+        2'b01: begin    //d1 is min
+            case (d2_flag)
+            2'b11: cmp_lte = 1;  //d2 is max
+            2'b00: cmp_lte = 1;  //d2 is normal
+            2'b01: cmp_lte = 1;  //d2 is min
+            default: cmp_lte = 0;
+            endcase
+        end
+        2'b11: begin    //d1 is max
+            case (d2_flag)
+            2'b11: cmp_lte = 1;  //d2 is max
+            default: cmp_lte = 0;
+            endcase
+        end
+        2'b00: begin    //d1 is normal
+            case(d2_flag)
+            2'b11: cmp_lte = 1;  //d2 is max
+            2'b01: cmp_lte = 0;  //d2 is min
+            2'b00: cmp_lte = d1_key < d2_key || d1_key == d2_key;  //d2 is normal
+            default: cmp_lte = 0;
+            endcase
+        end
+        default:
+            cmp_lte = 0;
+        endcase
+    end
+endfunction
+		    
+		
+		
+		
+		
+/*		
+		//d1 is initial data
+		if (d1_flag==2'b01)
+			cmp_lte = 1;
+		//d1 is flush data
+		else if (d1_flag==2'b11)
+			cmp_lte = 0;
+		//d1 is variable
+		else if (d1_flag==2'b00) begin
+			//d2 is initial data
+			if (d2_flag==2'b01)
+				cmp_lte = 0;
+			//d2 is flush data
+			else if (d2_flag==2'b11)
+				cmp_lte = 1;
+			//d2 is variable
+			else if (d2_flag==2'b00)
+				cmp_lte = d1_key<d2_key || d1_key==d2_key;
+			else
+				cmp_lte = 0;
+		end
+		else
+			cmp_lte = 0;
+	end
+endfunction
+*/
 
 `ifdef SIM
 wire [KEY_WIDTH-1:0] lm_in_key, rm_in_key, pl_in_key;
@@ -310,3 +433,4 @@ assign rm_out_key = rm_out[KEY_WIDTH-1:0];
 `endif	
 	
 endmodule
+

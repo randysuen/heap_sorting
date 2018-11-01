@@ -1,43 +1,43 @@
 `timescale 1ns / 1ps
-
-////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////
 // Company: 
-// Engineer:
-//
-// Create Date:   15:07:51 01/16/2018
-// Design Name:   heap
-// Module Name:   D:/mediasoc_project/803 FPGA 2017_10/fpga803/board_image/sim/heap_tb.v
-// Project Name:  image
-// Target Device:  
-// Tool versions:  
+// Engineer: 
+// 
+// Create Date: 10/18/2018 04:29:40 PM
+// Design Name: 
+// Module Name: sort_node_tb
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
 // Description: 
-//
-// Verilog Test Fixture created by ISE for module: heap
-//
-// Dependencies:
+// 
+// Dependencies: 
 // 
 // Revision:
 // Revision 0.01 - File Created
 // Additional Comments:
 // 
-////////////////////////////////////////////////////////////////////////////////
-`include "D:/mediasoc_project/803 FPGA 2017_10/fpga803/board_image/include/define.v"
+//////////////////////////////////////////////////////////////////////////////////
 module heap_tb;
+parameter DATA_WIDTH = 8;
+parameter KEY_WIDTH = 4;
+parameter NLEVELS = 5;
+
 
 	// Inputs
 	reg clk;
 	reg rstn;
-	reg [`DATA_WIDTH-1:0] din;
+	reg [DATA_WIDTH-1:0] din;
 	reg en;
 	reg init;
 	reg flush;
 	reg waiting;
 	// Outputs
-	wire [`DATA_WIDTH-1:0] dout;
+	wire [DATA_WIDTH-1:0] dout;
 	wire valid;
 
 	// Instantiate the Unit Under Test (UUT)
-	heap#(.DATA_WIDTH(`DATA_WIDTH),.KEY_WIDTH(`KEY_WIDTH),.NLEVELS(`NLEVELS)) uut (
+	heap#(.DATA_WIDTH(DATA_WIDTH),.KEY_WIDTH(KEY_WIDTH),.NLEVELS(NLEVELS)) uut (
 		.clk(clk), 
 		.rstn(rstn), 
 		.din(din), 
@@ -69,8 +69,9 @@ module heap_tb;
 		
 		#1000;
 		waiting = 0;
-		#1000;
+		#800;
 		waiting = 1;
+		#200;
 		flush = 1;
 		#15;
 		flush = 0;
@@ -88,17 +89,21 @@ always@(posedge clk or negedge rstn) begin
 	end
 	else if (!waiting) begin
 		en <= ~en;
-		if (en)
-			din <= ({$random}%256);
+		if (en) begin
+			din[KEY_WIDTH-1:0] <= ({$random}%256);
+			//din[DATA_WIDTH-3:KEY_WIDTH] <= 0;
+			din[DATA_WIDTH-1:KEY_WIDTH] <= 0;
+        end
 	end
+	else
+	   en <= 0;
 end
 		
-wire [`KEY_WIDTH-1:0] din_key;
-wire [`KEY_WIDTH-1:0] dout_key;
+wire [KEY_WIDTH-1:0] din_key;
+wire [KEY_WIDTH-1:0] dout_key;
 
-assign din_key = din[`KEY_WIDTH-1:0];
-assign dout_key = dout[`KEY_WIDTH-1:0];
+assign din_key = din[KEY_WIDTH-1:0];
+assign dout_key = dout[KEY_WIDTH-1:0];
 
    
 endmodule
-
